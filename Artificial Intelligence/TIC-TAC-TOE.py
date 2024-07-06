@@ -1,120 +1,317 @@
-import tkinter as tk
-from functools import partial
-from tkinter import messagebox
 
-class TicTacToeAI:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("Tic-Tac-Toe AI")
-        self.window.geometry('600x600')
-        self.center_window()
-        self.window.configure(bg='#ADD8E6') 
-        self.board = ['' for _ in range(9)]
-        self.current_player = 'X'
-        self.button_color = '#FFB6C1'  
-        self.text_color = '#000080'  
-        self.buttons = [tk.Button(self.window, text='', font='Arial 20', width=10, height=5, bg=self.button_color, fg=self.text_color, command=partial(self.make_move, i)) for i in range(9)]
-        self.reset_button = tk.Button(self.window, text='Reset', font='Arial 20', bg='#FFA07A', fg=self.text_color, command=self.reset_board)  
-        self.draw_board()
-        self.window.mainloop()
+from math import inf as infinity
+from random import choice
+import platform
+import time
+from os import system
 
-    def draw_board(self):
-        for i, button in enumerate(self.buttons):
-            row, col = divmod(i, 3)
-            button.grid(row=row, column=col, padx=10, pady=10)
-        self.reset_button.grid(row=3, column=0, columnspan=3, pady=20)
+"""
+An implementation of Minimax AI Algorithm in Tic Tac Toe,
+using Python.
+Author: saikiran Vadamadura
+Year: 2024
+"""
 
-    def center_window(self):
-        self.window.update_idletasks()
-        width = self.window.winfo_width()
-        height = self.window.winfo_height()
-        x = (self.window.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.window.winfo_screenheight() // 2) - (height // 2)
-        self.window.geometry(f'{width}x{height}+{x}+{y}')
+HUMAN = -1
+COMP = +1
+board = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+]
 
-    def reset_board(self):
-        self.board = ['' for _ in range(9)]
-        self.current_player = 'X'
-        for button in self.buttons:
-            button.config(text='', state=tk.NORMAL, bg=self.button_color, fg=self.text_color)
 
-    def make_move(self, index):
-        if self.board[index] == '' and self.current_player == 'X':
-            self.board[index] = 'X'
-            self.buttons[index].config(text='X', state=tk.DISABLED, bg='#98FB98')  
-            if not self.check_winner():
-                self.current_player = 'O'
-                self.window.after(500, self.ai_move)
+def evaluate(state):
+    """
+    Function to heuristic evaluation of state.
+    :param state: the state of the current board
+    :return: +1 if the computer wins; -1 if the human wins; 0 draw
+    """
+    if wins(state, COMP):
+        score = +1
+    elif wins(state, HUMAN):
+        score = -1
+    else:
+        score = 0
 
-    def ai_move(self):
-        best_score = float('-inf')
-        best_move = None
-        for i in range(9):
-            if self.board[i] == '':
-                self.board[i] = 'O'
-                score = self.minimax(self.board, 0, False)
-                self.board[i] = ''
-                if score > best_score:
-                    best_score = score
-                    best_move = i
-        if best_move is not None:
-            self.board[best_move] = 'O'
-            self.buttons[best_move].config(text='O', state=tk.DISABLED, bg='#FF6347')  
-        if not self.check_winner():
-            self.current_player = 'X'
+    return score
 
-    def minimax(self, board, depth, is_maximizing):
-        winner = self.check_winner_temp(board)
-        if winner:
-            return {'X': -1, 'O': 1, 'Tie': 0}[winner]
-        if is_maximizing:
-            best_score = float('-inf')
-            for i in range(9):
-                if board[i] == '':
-                    board[i] = 'O'
-                    score = self.minimax(board, depth + 1, False)
-                    board[i] = ''
-                    best_score = max(score, best_score)
-            return best_score
+
+def wins(state, player):
+    """
+    This function tests if a specific player wins. Possibilities:
+    * Three rows    [X X X] or [O O O]
+    * Three cols    [X X X] or [O O O]
+    * Two diagonals [X X X] or [O O O]
+    :param state: the state of the current board
+    :param player: a human or a computer
+    :return: True if the player wins
+    """
+    win_state = [
+        [state[0][0], state[0][1], state[0][2]],
+        [state[1][0], state[1][1], state[1][2]],
+        [state[2][0], state[2][1], state[2][2]],
+        [state[0][0], state[1][0], state[2][0]],
+        [state[0][1], state[1][1], state[2][1]],
+        [state[0][2], state[1][2], state[2][2]],
+        [state[0][0], state[1][1], state[2][2]],
+        [state[2][0], state[1][1], state[0][2]],
+    ]
+    if [player, player, player] in win_state:
+        return True
+    else:
+        return False
+
+
+def game_over(state):
+    """
+    This function test if the human or computer wins
+    :param state: the state of the current board
+    :return: True if the human or computer wins
+    """
+    return wins(state, HUMAN) or wins(state, COMP)
+
+
+def empty_cells(state):
+    """
+    Each empty cell will be added into cells' list
+    :param state: the state of the current board
+    :return: a list of empty cells
+    """
+    cells = []
+
+    for x, row in enumerate(state):
+        for y, cell in enumerate(row):
+            if cell == 0:
+                cells.append([x, y])
+
+    return cells
+
+
+def valid_move(x, y):
+    """
+    A move is valid if the chosen cell is empty
+    :param x: X coordinate
+    :param y: Y coordinate
+    :return: True if the board[x][y] is empty
+    """
+    if [x, y] in empty_cells(board):
+        return True
+    else:
+        return False
+
+
+def set_move(x, y, player):
+    """
+    Set the move on board, if the coordinates are valid
+    :param x: X coordinate
+    :param y: Y coordinate
+    :param player: the current player
+    """
+    if valid_move(x, y):
+        board[x][y] = player
+        return True
+    else:
+        return False
+
+
+def minimax(state, depth, player):
+    """
+    AI function that choice the best move
+    :param state: current state of the board
+    :param depth: node index in the tree (0 <= depth <= 9),
+    but never nine in this case (see iaturn() function)
+    :param player: an human or a computer
+    :return: a list with [the best row, best col, best score]
+    """
+    if player == COMP:
+        best = [-1, -1, -infinity]
+    else:
+        best = [-1, -1, +infinity]
+
+    if depth == 0 or game_over(state):
+        score = evaluate(state)
+        return [-1, -1, score]
+
+    for cell in empty_cells(state):
+        x, y = cell[0], cell[1]
+        state[x][y] = player
+        score = minimax(state, depth - 1, -player)
+        state[x][y] = 0
+        score[0], score[1] = x, y
+
+        if player == COMP:
+            if score[2] > best[2]:
+                best = score  # max value
         else:
-            best_score = float('inf')
-            for i in range(9):
-                if board[i] == '':
-                    board[i] = 'X'
-                    score = self.minimax(board, depth + 1, True)
-                    board[i] = ''
-                    best_score = min(score, best_score)
-            return best_score
+            if score[2] < best[2]:
+                best = score  # min value
 
-    def check_winner(self):
-        win_conditions = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7), (2, 5, 8), (0, 4, 8), (2, 4, 6)]
-        for (a, b, c) in win_conditions:
-            if self.board[a] == self.board[b] == self.board[c] != '':
-                for button in self.buttons:
-                    button.config(state=tk.DISABLED)
-                self.show_winner_message(self.board[a])
-                return self.board[a]
-        if '' not in self.board:
-            self.show_winner_message('Tie')
-            return 'Tie'
-        return None
+    return best
 
-    def check_winner_temp(self, board):
-        win_conditions = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (0, 3, 6), (1, 4, 7), (2, 5, 8), (0, 4, 8), (2, 4, 6)]
-        for (a, b, c) in win_conditions:
-            if board[a] == board[b] == board[c] != '':
-                return board[a]
-        if '' not in board:
-            return 'Tie'
-        return None
 
-    def show_winner_message(self, winner):
-        if winner == 'X':
-            messagebox.showinfo("Game Over", "You win!")
-        elif winner == 'O':
-            messagebox.showinfo("Game Over", "You lose!")
-        else:
-            messagebox.showinfo("Game Over", "It's a tie!")
-        self.reset_board()
+def clean():
+    """
+    Clears the console
+    """
+    os_name = platform.system().lower()
+    if 'windows' in os_name:
+        system('cls')
+    else:
+        system('clear')
 
-TicTacToeAI()
+
+def render(state, c_choice, h_choice):
+    """
+    Print the board on console
+    :param state: current state of the board
+    """
+
+    chars = {
+        -1: h_choice,
+        +1: c_choice,
+        0: ' '
+    }
+    str_line = '---------------'
+
+    print('\n' + str_line)
+    for row in state:
+        for cell in row:
+            symbol = chars[cell]
+            print(f'| {symbol} |', end='')
+        print('\n' + str_line)
+
+
+def ai_turn(c_choice, h_choice):
+    """
+    It calls the minimax function if the depth < 9,
+    else it choices a random coordinate.
+    :param c_choice: computer's choice X or O
+    :param h_choice: human's choice X or O
+    :return:
+    """
+    depth = len(empty_cells(board))
+    if depth == 0 or game_over(board):
+        return
+
+    clean()
+    print(f'Computer turn [{c_choice}]')
+    render(board, c_choice, h_choice)
+
+    if depth == 9:
+        x = choice([0, 1, 2])
+        y = choice([0, 1, 2])
+    else:
+        move = minimax(board, depth, COMP)
+        x, y = move[0], move[1]
+
+    set_move(x, y, COMP)
+    time.sleep(1)
+
+
+def human_turn(c_choice, h_choice):
+    """
+    The Human plays choosing a valid move.
+    :param c_choice: computer's choice X or O
+    :param h_choice: human's choice X or O
+    :return:
+    """
+    depth = len(empty_cells(board))
+    if depth == 0 or game_over(board):
+        return
+
+    # Dictionary of valid moves
+    move = -1
+    moves = {
+        1: [0, 0], 2: [0, 1], 3: [0, 2],
+        4: [1, 0], 5: [1, 1], 6: [1, 2],
+        7: [2, 0], 8: [2, 1], 9: [2, 2],
+    }
+
+    clean()
+    print(f'Human turn [{h_choice}]')
+    render(board, c_choice, h_choice)
+
+    while move < 1 or move > 9:
+        try:
+            move = int(input('Use numpad (1..9): '))
+            coord = moves[move]
+            can_move = set_move(coord[0], coord[1], HUMAN)
+
+            if not can_move:
+                print('Bad move')
+                move = -1
+        except (EOFError, KeyboardInterrupt):
+            print('Bye')
+            exit()
+        except (KeyError, ValueError):
+            print('Bad choice')
+
+
+def main():
+    """
+    Main function that calls all functions
+    """
+    clean()
+    h_choice = ''  # X or O
+    c_choice = ''  # X or O
+    first = ''  # if human is the first
+
+    # Human chooses X or O to play
+    while h_choice != 'O' and h_choice != 'X':
+        try:
+            print('')
+            h_choice = input('Choose X or O\nChosen: ').upper()
+        except (EOFError, KeyboardInterrupt):
+            print('Bye')
+            exit()
+        except (KeyError, ValueError):
+            print('Bad choice')
+
+    # Setting computer's choice
+    if h_choice == 'X':
+        c_choice = 'O'
+    else:
+        c_choice = 'X'
+
+    # Human may starts first
+    clean()
+    while first != 'Y' and first != 'N':
+        try:
+            first = input('First to start?[y/n]: ').upper()
+        except (EOFError, KeyboardInterrupt):
+            print('Bye')
+            exit()
+        except (KeyError, ValueError):
+            print('Bad choice')
+
+    # Main loop of this game
+    while len(empty_cells(board)) > 0 and not game_over(board):
+        if first == 'N':
+            ai_turn(c_choice, h_choice)
+            first = ''
+
+        human_turn(c_choice, h_choice)
+        ai_turn(c_choice, h_choice)
+
+    # Game over message
+    if wins(board, HUMAN):
+        clean()
+        print(f'Human turn [{h_choice}]')
+        render(board, c_choice, h_choice)
+        print('YOU WIN!')
+    elif wins(board, COMP):
+        clean()
+        print(f'Computer turn [{c_choice}]')
+        render(board, c_choice, h_choice)
+        print('YOU LOSE!')
+    else:
+        clean()
+        render(board, c_choice, h_choice)
+        print('DRAW!')
+
+    exit()
+
+
+if __name__ == '__main__':
+    main()
